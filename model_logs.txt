@@ -1,0 +1,2 @@
+#Ops: 73.694446 GOps
+#Parameters: 26.680721 M

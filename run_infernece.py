@@ -105,31 +105,6 @@ def rle_decode(mask_rle, shape):
         mask[start:start + length] = 1
     return mask.reshape(shape, order='F')
 
-def create_model(in_channels=4, device=device):
-    model = smp.DeepLabV3Plus(
-        encoder_name='resnet50',
-        encoder_weights='imagenet',
-        in_channels=3,
-        classes=1,
-        activation='sigmoid'
-    )
-    original_conv = model.encoder.conv1
-    new_conv = nn.Conv2d(
-        in_channels,
-        original_conv.out_channels,
-        kernel_size=original_conv.kernel_size,
-        stride=original_conv.stride,
-        padding=original_conv.padding,
-        bias=False
-    )
-    with torch.no_grad():
-        new_conv.weight[:, :3, :, :] = original_conv.weight.clone()
-        if in_channels > 3:
-            new_conv.weight[:, 3:, :, :] = original_conv.weight.mean(dim=1, keepdim=True).clone().repeat(1, in_channels - 3, 1, 1)
-    model.encoder.conv1 = new_conv
-    model.to(device)
-    print(f"Model created with {in_channels} input channels and moved to {device}.")
-    return model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Predict masks for images in the dataset')
@@ -143,15 +118,13 @@ if __name__ == '__main__':
 
     # Load model from the provided path and move to device
     model_path = args.model_path
-    model = create_model(in_channels=4, device=device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    print(f"Successfully loaded weights from {model_path}")
+    model = torch.load(model_path, map_location=device) 
     model.eval()
 
     records = []
     for x in range(len(dataset)):
         img = dataset[x]['image']
-        out = predict_img(model, img, device, out_threshold=0.5)
+        out=np.resize(predict_img(model,img,device,out_threshold=0.5),(256,256))
         records.append({
             'id': str(dataset.ids[x]),
             'segmentation': str(rle_encode(out))
